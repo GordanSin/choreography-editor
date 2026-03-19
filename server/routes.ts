@@ -1,5 +1,5 @@
 import type { Express } from "express";
-import { createServer, type Server } from "http";
+import type { Server } from "http";
 import { storage } from "./storage";
 import {
   insertProjectSchema,
@@ -7,17 +7,23 @@ import {
   insertMarkerSchema,
   updateMarkerSchema,
 } from "@shared/schema";
+import { ZodError } from "zod";
+
+function formatZodError(error: ZodError): string {
+  return error.errors.map((e) => `${e.path.join(".")}: ${e.message}`).join(", ");
+}
 
 export async function registerRoutes(
   httpServer: Server,
   app: Express
 ): Promise<Server> {
-  // Projects endpoints
-  app.get("/api/projects", async (req, res) => {
+  // Projects
+  app.get("/api/projects", async (_req, res) => {
     try {
       const allProjects = await storage.listProjects();
       res.json(allProjects);
     } catch (error) {
+      console.error("Failed to fetch projects:", error);
       res.status(500).json({ error: "Failed to fetch projects" });
     }
   });
@@ -30,6 +36,7 @@ export async function registerRoutes(
       }
       res.json(project);
     } catch (error) {
+      console.error("Failed to fetch project:", error);
       res.status(500).json({ error: "Failed to fetch project" });
     }
   });
@@ -39,8 +46,12 @@ export async function registerRoutes(
       const validated = insertProjectSchema.parse(req.body);
       const project = await storage.createProject(validated);
       res.status(201).json(project);
-    } catch (error: any) {
-      res.status(400).json({ error: error.message || "Invalid project data" });
+    } catch (error) {
+      if (error instanceof ZodError) {
+        return res.status(400).json({ error: formatZodError(error) });
+      }
+      console.error("Failed to create project:", error);
+      res.status(500).json({ error: "Failed to create project" });
     }
   });
 
@@ -49,8 +60,12 @@ export async function registerRoutes(
       const validated = updateProjectSchema.parse(req.body);
       const project = await storage.updateProject(req.params.id, validated);
       res.json(project);
-    } catch (error: any) {
-      res.status(400).json({ error: error.message || "Invalid project data" });
+    } catch (error) {
+      if (error instanceof ZodError) {
+        return res.status(400).json({ error: formatZodError(error) });
+      }
+      console.error("Failed to update project:", error);
+      res.status(500).json({ error: "Failed to update project" });
     }
   });
 
@@ -59,16 +74,18 @@ export async function registerRoutes(
       await storage.deleteProject(req.params.id);
       res.status(204).send();
     } catch (error) {
+      console.error("Failed to delete project:", error);
       res.status(500).json({ error: "Failed to delete project" });
     }
   });
 
-  // Markers endpoints
+  // Markers
   app.get("/api/projects/:projectId/markers", async (req, res) => {
     try {
       const markerList = await storage.getProjectMarkers(req.params.projectId);
       res.json(markerList);
     } catch (error) {
+      console.error("Failed to fetch markers:", error);
       res.status(500).json({ error: "Failed to fetch markers" });
     }
   });
@@ -78,8 +95,12 @@ export async function registerRoutes(
       const validated = insertMarkerSchema.parse(req.body);
       const marker = await storage.createMarker(validated);
       res.status(201).json(marker);
-    } catch (error: any) {
-      res.status(400).json({ error: error.message || "Invalid marker data" });
+    } catch (error) {
+      if (error instanceof ZodError) {
+        return res.status(400).json({ error: formatZodError(error) });
+      }
+      console.error("Failed to create marker:", error);
+      res.status(500).json({ error: "Failed to create marker" });
     }
   });
 
@@ -88,8 +109,12 @@ export async function registerRoutes(
       const validated = updateMarkerSchema.parse(req.body);
       const marker = await storage.updateMarker(req.params.id, validated);
       res.json(marker);
-    } catch (error: any) {
-      res.status(400).json({ error: error.message || "Invalid marker data" });
+    } catch (error) {
+      if (error instanceof ZodError) {
+        return res.status(400).json({ error: formatZodError(error) });
+      }
+      console.error("Failed to update marker:", error);
+      res.status(500).json({ error: "Failed to update marker" });
     }
   });
 
@@ -98,6 +123,7 @@ export async function registerRoutes(
       await storage.deleteMarker(req.params.id);
       res.status(204).send();
     } catch (error) {
+      console.error("Failed to delete marker:", error);
       res.status(500).json({ error: "Failed to delete marker" });
     }
   });
